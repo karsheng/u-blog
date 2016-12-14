@@ -2,4 +2,6 @@
 
 {% block content %}
   {{post.render() | safe}}
+  <br><br>
+  <a href="/blog/edit/{{post.key().id()}}">Edit Post</a>
 {% endblock %}
