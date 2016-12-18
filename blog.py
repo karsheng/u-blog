@@ -57,12 +57,13 @@ class BlogHandler(webapp2.RequestHandler):
 
     def initialize(self, *a, **kw):
         webapp2.RequestHandler.initialize(self, *a, **kw)
-        uid = self.read_secure_cookie('user_id')
-        self.user = uid and User.by_id(int(uid))
+        self.uid = self.read_secure_cookie('user_id')
+        self.user = self.uid and User.by_id(int(self.uid))
 
     def loggedin_check(self):
         if not self.user:
             self.redirect("/login")
+            return
 
 
 class MainPage(BlogHandler):
@@ -94,11 +95,11 @@ class User(db.Model):
 
     @classmethod
     def by_id(cls, uid):
-        return User.get_by_id(uid, parent = users_key())
+        return cls.get_by_id(uid, parent = users_key())
 
     @classmethod
     def by_name(cls, name):
-        u = User.all().filter('name =', name).get()
+        u = cls.all().filter('name =', name).get()
         return u
 
     @classmethod
@@ -122,14 +123,32 @@ def blog_key(name = 'default'):
     return db.Key.from_path('blogs', name)
 
 class Post(db.Model):
+    uid = db.StringProperty(required = True)
     subject = db.StringProperty(required = True)
     content = db.TextProperty(required = True)
     created = db.DateTimeProperty(auto_now_add = True)
     last_modified = db.DateTimeProperty(auto_now = True)
 
-    def render(self):
+    def render(self, uid):
+        user = User.by_id(int(uid))
         self._render_text = self.content.replace('\n', '<br>')
+        self._post_username = user.name
+        self._no_of_likes = Like.get_by_post_id(str(self.key().id()))
         return render_str("post.html", p = self)
+
+class Like(db.Model):
+    post_id = db.StringProperty(required = True)
+    uid = db.StringProperty(required = True)
+
+    @classmethod
+    def get_by_post_id(cls, post_id):
+        q = cls.gql("WHERE post_id = :post_id", post_id = post_id)
+        return q.count()
+
+    @classmethod
+    def user_liked(cls, post_id, uid=""):
+        q = cls.gql("WHERE post_id = :post_id and uid = :uid", post_id = post_id, uid = uid)
+        return q.get()
 
 class BlogFront(BlogHandler):
     def get(self):
@@ -137,15 +156,65 @@ class BlogFront(BlogHandler):
         self.render('front.html', posts = posts)
 
 class PostPage(BlogHandler):
-    def get(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-
+    # to check if user is authorized to proceed by comparing user_id and the post associated user_id
+    # returns post if true
+    def user_auth(self, post_id):
+        post = self.retrieve_post(post_id)
         if not post:
             self.error(404)
             return
+        if self.uid == post.uid:
+            return post
 
-        self.render("permalink.html", post = post)
+    def retrieve_post(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        return post
+
+    def get(self, post_id):
+        posted_by_user = self.user_auth(post_id)
+
+        post = self.retrieve_post(post_id)
+        if not post:
+            self.error(404)
+            return
+        likes = Like.get_by_post_id(post_id)
+        if Like.user_liked(post_id, self.uid):
+            like = "Unliked"
+        else:
+            like = "Like"
+
+        self.render("permalink.html", post = post, like = like, posted_by_user = posted_by_user)
+
+    def post(self, post_id):
+        if not self.user:
+            self.redirect("/login")
+            return
+            
+        uid = self.uid
+        
+        post = self.retrieve_post(post_id)
+        likes = Like.get_by_post_id(post_id)
+        if not post:
+            self.error(404)
+            return
+        
+        posted_by_user = self.user_auth(post_id)
+
+        if posted_by_user:
+            self.render('forbidden.html')
+            return
+
+        user_liked = Like.user_liked(post_id, self.uid)
+
+        if not user_liked:
+            like = Like(parent = blog_key(), post_id = post_id, uid = uid)
+            like.put()            
+        else:
+            user_liked.delete()
+        
+        self.redirect('/blog/%s' % post_id)
+        
 
 class NewPost(BlogHandler):
     def get(self):
@@ -160,26 +229,21 @@ class NewPost(BlogHandler):
         content = self.request.get('content')
 
         if subject and content:
-            p = Post(parent = blog_key(), subject = subject, content = content)
+            p = Post(parent = blog_key(), uid = self.uid, subject = subject, content = content)
             p.put()
             self.redirect('/blog/%s' % str(p.key().id()))
         else:
             error = "subject and content, please!"
             self.render("newpost.html", subject=subject, content=content, error=error)
 
-class EditPost(BlogHandler):
-    def retrieve_post(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-        return post
-
+class EditPost(PostPage):
     def get(self, post_id):
         self.loggedin_check()
 
-        post = self.retrieve_post(post_id)
+        post = self.user_auth(post_id)
 
         if not post:
-            self.error(404)
+            self.render('forbidden.html')
             return
 
         params = dict(subject = post.subject,
@@ -193,11 +257,12 @@ class EditPost(BlogHandler):
         content = self.request.get('content')
 
         if subject and content:
-            post = self.retrieve_post(post_id)
+            post = self.user_auth(post_id)
         
             if not post:
-                self.error(404)
+                self.render('forbidden.html')
                 return
+
             post.subject = subject
             post.content = content
             post.put()

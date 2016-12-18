@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-  {{post.render() | safe}}
+  {{post.render(post.uid) | safe}}
   <br><br>
+  {% if posted_by_user: %}
   <a href="/blog/edit/{{post.key().id()}}">Edit Post</a>
+  {% else %}
+  <form method="post">
+  	<input class="link-like" type="submit" value="{{like}}">
+  </form>
+  {% endif %}
 {% endblock %}

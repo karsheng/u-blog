@@ -63,9 +63,6 @@ textarea {
   font-family: monospace;
 }
 
-input[type=submit] {
-  font-size: 24px;
-}
 
 .main-title {
     display: block;
@@ -103,3 +100,16 @@ input[type=submit] {
     margin-top: 5px;
 }
 
+.post-user {
+    font-size: 13px;
+    color: gray;
+}
+
+.link-like {
+    background: none;
+    border: none;
+    color: blue;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 12px;
+}
