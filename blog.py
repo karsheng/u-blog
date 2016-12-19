@@ -133,7 +133,7 @@ class Post(db.Model):
         user = User.by_id(int(uid))
         self._render_text = self.content.replace('\n', '<br>')
         self._post_username = user.name
-        self._no_of_likes = Like.get_by_post_id(str(self.key().id()))
+        self._no_of_likes = Like.get_by_post_id(str(self.key().id())).count()
         return render_str("post.html", p = self)
 
 class Like(db.Model):
@@ -143,7 +143,7 @@ class Like(db.Model):
     @classmethod
     def get_by_post_id(cls, post_id):
         q = cls.gql("WHERE post_id = :post_id", post_id = post_id)
-        return q.count()
+        return q
 
     @classmethod
     def user_liked(cls, post_id, uid=""):
@@ -178,7 +178,6 @@ class PostPage(BlogHandler):
         if not post:
             self.error(404)
             return
-        likes = Like.get_by_post_id(post_id)
         if Like.user_liked(post_id, self.uid):
             like = "Unliked"
         else:
@@ -190,11 +189,10 @@ class PostPage(BlogHandler):
         if not self.user:
             self.redirect("/login")
             return
-            
+
         uid = self.uid
         
         post = self.retrieve_post(post_id)
-        likes = Like.get_by_post_id(post_id)
         if not post:
             self.error(404)
             return
@@ -220,7 +218,7 @@ class NewPost(BlogHandler):
     def get(self):
         self.loggedin_check()
 
-        self.render("newpost.html")
+        self.render("writepost.html", newpost=True)
 
     def post(self):
         self.loggedin_check()
@@ -229,14 +227,15 @@ class NewPost(BlogHandler):
         content = self.request.get('content')
 
         if subject and content:
-            p = Post(parent = blog_key(), uid = self.uid, subject = subject, content = content)
+            p = Post(parent = blog_key(), uid=self.uid, subject=subject, content=content)
             p.put()
             self.redirect('/blog/%s' % str(p.key().id()))
         else:
             error = "subject and content, please!"
-            self.render("newpost.html", subject=subject, content=content, error=error)
+            self.render("writepost.html", subject=subject, content=content, error=error)
 
 class EditPost(PostPage):
+
     def get(self, post_id):
         self.loggedin_check()
 
@@ -247,17 +246,20 @@ class EditPost(PostPage):
             return
 
         params = dict(subject = post.subject,
-                      content = post.content)
-        self.render("newpost.html", **params)
+                      content = post.content,
+                      post_id = post_id,
+                      newpost = False)
+
+        self.render("writepost.html", **params)
     
     def post(self, post_id):
         self.loggedin_check()
 
         subject = self.request.get('subject')
         content = self.request.get('content')
+        post = self.user_auth(post_id)
 
         if subject and content:
-            post = self.user_auth(post_id)
         
             if not post:
                 self.render('forbidden.html')
@@ -269,8 +271,35 @@ class EditPost(PostPage):
             self.redirect('/blog/%s' % str(post.key().id()))
         else:
             error = "subject and content, please!"
-            self.render("newpost.html", subject=subject, content=content, error=error)
+            params = dict(subject = subject,
+                      content = content,
+                      post_id = post_id,
+                      error = error,
+                      newpost = False)
+            
+            self.render("writepost.html", **params)
         
+class DeletePost(PostPage):
+    def get(self, post_id):
+        post = self.user_auth(post_id)
+        if not post:
+            self.render("forbidden.html")
+            return
+
+        self.render("delete.html", post_subject = post.subject)
+
+    def post(self, post_id):
+        post = self.user_auth(post_id)
+        if not post:
+            self.render("forbidden.html")
+            return
+        likes = Like.get_by_post_id(post_id)
+        post.delete()
+        for like in likes:
+            like.delete()
+            
+        self.redirect("/blog")
+
 
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
 def valid_username(username):
@@ -358,6 +387,7 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/([0-9]+)', PostPage),
                                ('/blog/newpost', NewPost),
                                ('/blog/edit/([0-9]+)', EditPost),
+                               ('/blog/delete/([0-9]+)', DeletePost),
                                ('/signup', Signup),
                                ('/login', Login),
                                ('/logout', Logout),

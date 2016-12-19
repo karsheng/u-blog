@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h2>new post</h2>
+
+  <h2>
+  {% if newpost: %}
+    New Post
+  {% else: %}
+    Edit Post
+  {% endif %}
+  </h2>
 
     <form method="post">
       <label>
@@ -17,5 +24,10 @@
       <div class="error">{{error}}</div>
 
       <input type="submit">
+      <a href="/blog">Cancel</a>
+      {% if not newpost: %}
+        <a href="/blog/delete/{{post_id}}">Delete</a>
+      {% endif %}
     </form>
+
 {% endblock %}
