@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+  <h2>Comment</h2>
+
+    <form method="post">
+
+      <textarea name="comment">{{comment_text}}</textarea>
+      <div class="error">{{error}}</div>
+
+      <input type="submit">
+      <a href="/blog">Cancel</a>
+      {% if not newcomment: %}
+        <a href="/blog/dcomment/{{comment.key().id()}}">Delete</a>
+      {% endif %}
+    </form>
+
+{% endblock %}

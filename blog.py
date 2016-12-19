@@ -150,6 +150,28 @@ class Like(db.Model):
         q = cls.gql("WHERE post_id = :post_id and uid = :uid", post_id = post_id, uid = uid)
         return q.get()
 
+class Comment(db.Model):
+    post_id = db.StringProperty(required = True)
+    uid = db.StringProperty(required = True)
+    comment = db.TextProperty(required = True)
+    created = db.DateTimeProperty(auto_now_add = True)
+    last_modified = db.DateTimeProperty(auto_now = True)
+
+    def render(self, commenter_uid, uid):
+        if uid == commenter_uid:
+            self._by_user = True
+
+        commenter = User.by_id(int(commenter_uid))
+        self._render_text = self.comment.replace('\n', '<br>')
+        self._commenter = commenter.name
+        return render_str("comment.html", comment=self)
+
+    @classmethod
+    def get_by_post_id(cls, post_id):
+        q = cls.gql("WHERE post_id = :post_id ORDER BY created DESC", post_id = post_id)
+        return q
+
+
 class BlogFront(BlogHandler):
     def get(self):
         posts = greetings = Post.all().order('-created')
@@ -172,6 +194,7 @@ class PostPage(BlogHandler):
         return post
 
     def get(self, post_id):
+        comments = Comment.get_by_post_id(post_id)
         posted_by_user = self.user_auth(post_id)
 
         post = self.retrieve_post(post_id)
@@ -183,7 +206,7 @@ class PostPage(BlogHandler):
         else:
             like = "Like"
 
-        self.render("permalink.html", post = post, like = like, posted_by_user = posted_by_user)
+        self.render("permalink.html", post=post, like=like, posted_by_user=posted_by_user, comments=comments, uid=self.uid)
 
     def post(self, post_id):
         if not self.user:
@@ -247,7 +270,6 @@ class EditPost(PostPage):
 
         params = dict(subject = post.subject,
                       content = post.content,
-                      post_id = post_id,
                       newpost = False)
 
         self.render("writepost.html", **params)
@@ -276,11 +298,12 @@ class EditPost(PostPage):
                       post_id = post_id,
                       error = error,
                       newpost = False)
-            
+
             self.render("writepost.html", **params)
         
 class DeletePost(PostPage):
     def get(self, post_id):
+        self.loggedin_check()
         post = self.user_auth(post_id)
         if not post:
             self.render("forbidden.html")
@@ -289,6 +312,7 @@ class DeletePost(PostPage):
         self.render("delete.html", post_subject = post.subject)
 
     def post(self, post_id):
+        self.loggedin_check()
         post = self.user_auth(post_id)
         if not post:
             self.render("forbidden.html")
@@ -300,6 +324,97 @@ class DeletePost(PostPage):
             
         self.redirect("/blog")
 
+class NewComment(BlogHandler):
+    def get(self, post_id):
+        self.loggedin_check()
+
+        self.render("writecomment.html", newcomment=True)
+
+    def post(self, post_id):
+        self.loggedin_check()
+        comment_text = self.request.get('comment')
+
+        if comment_text:
+            c = Comment(parent = blog_key(), post_id=post_id, uid=self.uid, comment=comment_text)
+            c.put()
+            self.redirect('/blog/%s' % post_id)
+        else:
+            error = "leave a comment, please!"
+            self.render("writecomment.html", comment_text=comment_text, error=error, newcomment=True)
+
+
+class EditComment(BlogHandler):
+    def commenter_auth(self, comment_id):
+        comment = self.retrieve_comment(comment_id)
+        if not comment:
+            self.error(404)
+            return
+        if self.uid == comment.uid:
+            return comment
+
+    def retrieve_comment(self, comment_id):
+        key = db.Key.from_path('Comment', int(comment_id), parent=blog_key())
+        comment = db.get(key)
+        return comment
+
+    def get(self, comment_id):
+        self.loggedin_check()
+
+        comment = self.commenter_auth(comment_id)
+        comment_text = comment.comment
+
+        if not comment:
+            self.render('forbidden.html')
+            return
+
+        params = dict(comment_text = comment_text,
+                      newcomment = False,
+                      comment=comment)
+
+        self.render("writecomment.html", **params)
+
+    def post(self, comment_id):
+        self.loggedin_check()
+        comment_text = self.request.get('comment')
+        comment = self.commenter_auth(comment_id)
+
+        if comment_text:
+            if not comment:
+                self.render('forbidden.html')
+                return
+            comment.comment = comment_text
+            comment.put()
+            self.redirect('/blog/%s' % comment.post_id)
+        else:
+            error = "Leave a comment, please!"
+            params = dict(comment_text = comment_text,
+                      error = error,
+                      newcomment = False,
+                      comment=comment)
+
+            self.render("writecomment.html", **params)
+
+class DeleteComment(EditComment):
+    def get(self, comment_id):
+        self.loggedin_check()
+
+        comment = self.commenter_auth(comment_id)
+        if not comment:
+            self.render("forbidden.html")
+            return
+
+        self.render("delete-comment.html")
+
+    def post(self, comment_id):
+        self.loggedin_check()
+
+        comment = self.commenter_auth(comment_id)
+        if not comment:
+            self.render("forbidden.html")
+            return
+        post_id = comment.post_id
+        comment.delete()    
+        self.redirect("/blog/" + post_id)    
 
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
 def valid_username(username):
@@ -388,6 +503,9 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/newpost', NewPost),
                                ('/blog/edit/([0-9]+)', EditPost),
                                ('/blog/delete/([0-9]+)', DeletePost),
+                               ('/blog/comment/([0-9]+)', NewComment),
+                               ('/blog/ecomment/([0-9]+)', EditComment),
+                               ('/blog/dcomment/([0-9]+)', DeleteComment),
                                ('/signup', Signup),
                                ('/login', Login),
                                ('/logout', Logout),

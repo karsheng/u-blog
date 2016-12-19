@@ -1,0 +1,21 @@
+<div class="comment">
+  <div class="comment-heading">
+    <div class="comment-date">
+      {{comment.created.strftime("%b %d, %Y")}}
+    </div>
+  </div>
+  <div class="comment-content">
+    {{comment._render_text | safe}}
+  </div>
+  <br><br>
+    <div class="comment-username">
+    Commented by: {{comment._commenter | safe}}
+  </div>
+  <div class="edit-comment">
+    {% if comment._by_user: %}  
+    <a href="/blog/ecomment/{{comment.key().id()}}">Edit Comment</a>
+    {% endif %}
+  </div>
+</div>
+<br><br>
+<hr>

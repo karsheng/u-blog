@@ -10,4 +10,12 @@
   	<input class="link-like" type="submit" value="{{like}}">
   </form>
   {% endif %}
+  <a href="/blog/comment/{{post.key().id()}}">Comment</a>
+
+	<h3>Comments</h3>
+  {% for comment in comments %}
+    {{ comment.render(comment.uid, uid) | safe }}
+    <br><br>
+  {% endfor %}
+
 {% endblock %}
