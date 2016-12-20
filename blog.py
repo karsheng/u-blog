@@ -134,6 +134,7 @@ class Post(db.Model):
         self._render_text = self.content.replace('\n', '<br>')
         self._post_username = user.name
         self._no_of_likes = Like.get_by_post_id(str(self.key().id())).count()
+        self._no_of_comments = Comment.get_by_post_id(str(self.key().id())).count()
         return render_str("post.html", p = self)
 
 class Like(db.Model):
@@ -202,7 +203,7 @@ class PostPage(BlogHandler):
             self.error(404)
             return
         if Like.user_liked(post_id, self.uid):
-            like = "Unliked"
+            like = "Unlike"
         else:
             like = "Like"
 
@@ -255,7 +256,7 @@ class NewPost(BlogHandler):
             self.redirect('/blog/%s' % str(p.key().id()))
         else:
             error = "subject and content, please!"
-            self.render("writepost.html", subject=subject, content=content, error=error)
+            self.render("writepost.html", subject=subject, content=content, error=error, newpost=True)
 
 class EditPost(PostPage):
 
@@ -270,6 +271,7 @@ class EditPost(PostPage):
 
         params = dict(subject = post.subject,
                       content = post.content,
+                      post_id = post_id,
                       newpost = False)
 
         self.render("writepost.html", **params)

@@ -23,10 +23,12 @@
 
       <div class="error">{{error}}</div>
 
-      <input type="submit">
+      <input class="submit-btn" type="submit">
       <a href="/blog">Cancel</a>
       {% if not newpost: %}
-        <a href="/blog/delete/{{post_id}}">Delete</a>
+      <div class="right">
+        <a class="delete-btn" href="/blog/delete/{{post_id}}">Delete</a>
+      </div>
       {% endif %}
     </form>
 

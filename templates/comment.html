@@ -1,21 +1,16 @@
 <div class="comment">
   <div class="comment-heading">
-    <div class="comment-date">
-      {{comment.created.strftime("%b %d, %Y")}}
-    </div>
+      <h3>{{comment._commenter | safe}} | <span class="comment-date">{{comment.created.strftime("%b %d, %Y")}}</span></h3>
   </div>
   <div class="comment-content">
     {{comment._render_text | safe}}
   </div>
   <br><br>
-    <div class="comment-username">
-    Commented by: {{comment._commenter | safe}}
-  </div>
   <div class="edit-comment">
     {% if comment._by_user: %}  
-    <a href="/blog/ecomment/{{comment.key().id()}}">Edit Comment</a>
+    <a href="/blog/ecomment/{{comment.key().id()}}">Edit</a>
     {% endif %}
   </div>
 </div>
-<br><br>
+<br>
 <hr>

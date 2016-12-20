@@ -8,7 +8,15 @@ body {
     padding: 10px;
     color: #333;
 }
+a {
+    text-decoration: none;
+    color: #11C;
+}
 
+a:hover {
+    text-decoration: none;
+    color: #4099FF;
+}
 .login-area {
     font-size: 13px;
     color: gray;
@@ -88,6 +96,14 @@ textarea {
     font-weight: bold;
 }
 
+.post-title a {
+    color: #222;
+}
+
+.post-title a:hover {
+    color: #4099FF;
+}
+
 .post-date {
     position: absolute;
     right: 0px;
@@ -108,8 +124,31 @@ textarea {
 .link-like {
     background: none;
     border: none;
-    color: blue;
-    text-decoration: underline;
+    color: #11C;
+    text-decoration: none;
     cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+}
+
+.comment-date {
     font-size: 12px;
+    color: #999;
+}
+
+.right {
+    float: right;
+    position: relative;
+}
+
+form {
+    width: 500px;
+}
+
+.submit-btn {
+    margin: 0 20px 0 0;
+}
+
+.delete-btn {
+    color: red;
 }
