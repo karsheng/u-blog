@@ -17,6 +17,29 @@ a:hover {
     text-decoration: none;
     color: #4099FF;
 }
+
+.newpost-area {
+    font-size: 13px;
+    color: gray;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+
+.newpost-link {
+    color: gray;
+    text-decoration: none;
+}
+
+.newpost-link:visited {
+    color: gray;
+}
+
+.newpost-link:hover {
+    text-decoration: underline;
+}
+
+
 .login-area {
     font-size: 13px;
     color: gray;

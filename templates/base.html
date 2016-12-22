@@ -11,6 +11,13 @@
     Large Blog
   </a>
 
+    {% if user %}
+      <div class="newpost-area">
+      <a class="newpost-link" href="/blog/newpost">New Post</a>
+      </div>
+    {% endif %}
+  
+
   <div class="login-area">
     {% if user %}
       {{user.name}} (<a class="login-link" href="/logout">logout</a>)

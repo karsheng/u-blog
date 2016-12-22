@@ -28,6 +28,7 @@ def check_secure_val(secure_val):
     if secure_val == make_secure_val(val):
         return val
 
+# Main handler of the blog
 class BlogHandler(webapp2.RequestHandler):
     def write(self, *a, **kw):
         self.response.out.write(*a, **kw)
@@ -65,13 +66,11 @@ class BlogHandler(webapp2.RequestHandler):
             self.redirect("/login")
             return
 
-
 class MainPage(BlogHandler):
-  def get(self):
-      self.write('Hello, Udacity!')
+    def get(self):
+        self.write('Hello!')
 
-
-##### user stuff
+# functions for hashing and password validations
 def make_salt(length = 5):
     return ''.join(random.choice(letters) for x in xrange(length))
 
@@ -88,20 +87,24 @@ def valid_pw(name, password, h):
 def users_key(group = 'default'):
     return db.Key.from_path('users', group)
 
+# The user model.
 class User(db.Model):
     name = db.StringProperty(required = True)
     pw_hash = db.StringProperty(required = True)
     email = db.StringProperty()
 
+    # gets instance by the user id (uid)
     @classmethod
     def by_id(cls, uid):
         return cls.get_by_id(uid, parent = users_key())
 
+    # gets instance by the name of user
     @classmethod
     def by_name(cls, name):
         u = cls.all().filter('name =', name).get()
         return u
 
+    # returns User for registration in the model
     @classmethod
     def register(cls, name, pw, email = None):
         pw_hash = make_pw_hash(name, pw)
@@ -110,6 +113,7 @@ class User(db.Model):
                     pw_hash = pw_hash,
                     email = email)
 
+    # validates user and password, returns user instance if success
     @classmethod
     def login(cls, name, pw):
         u = cls.by_name(name)
@@ -117,11 +121,11 @@ class User(db.Model):
             return u
 
 
-##### blog stuff
-
+# blog key to be used for data storing.
 def blog_key(name = 'default'):
     return db.Key.from_path('blogs', name)
 
+# Post model - to store user posts data
 class Post(db.Model):
     uid = db.StringProperty(required = True)
     subject = db.StringProperty(required = True)
@@ -129,6 +133,7 @@ class Post(db.Model):
     created = db.DateTimeProperty(auto_now_add = True)
     last_modified = db.DateTimeProperty(auto_now = True)
 
+    # renders a post and its data using the post.html template
     def render(self, uid):
         user = User.by_id(int(uid))
         self._render_text = self.content.replace('\n', '<br>')
@@ -137,20 +142,24 @@ class Post(db.Model):
         self._no_of_comments = Comment.get_by_post_id(str(self.key().id())).count()
         return render_str("post.html", p = self)
 
+# Like model - to store likes of posts by users
 class Like(db.Model):
     post_id = db.StringProperty(required = True)
     uid = db.StringProperty(required = True)
 
+    # Get the like instances by post_id
     @classmethod
     def get_by_post_id(cls, post_id):
         q = cls.gql("WHERE post_id = :post_id", post_id = post_id)
         return q
 
+    # Returns the instance if user liked the post
     @classmethod
     def user_liked(cls, post_id, uid=""):
         q = cls.gql("WHERE post_id = :post_id and uid = :uid", post_id = post_id, uid = uid)
         return q.get()
 
+# Comment model - to store comments posted by user on a post
 class Comment(db.Model):
     post_id = db.StringProperty(required = True)
     uid = db.StringProperty(required = True)
@@ -158,29 +167,32 @@ class Comment(db.Model):
     created = db.DateTimeProperty(auto_now_add = True)
     last_modified = db.DateTimeProperty(auto_now = True)
 
+    # Renders a comment by using the comment.html template
     def render(self, commenter_uid, uid):
         if uid == commenter_uid:
-            self._by_user = True
+            self._by_user = True # returns True if commented by logged in user
 
         commenter = User.by_id(int(commenter_uid))
         self._render_text = self.comment.replace('\n', '<br>')
         self._commenter = commenter.name
         return render_str("comment.html", comment=self)
 
+    # Returns the Comment instance by post_id
     @classmethod
     def get_by_post_id(cls, post_id):
         q = cls.gql("WHERE post_id = :post_id ORDER BY created DESC", post_id = post_id)
         return q
 
-
+# Handler of the Blog Front Page - list all posts ordered by date created.
 class BlogFront(BlogHandler):
     def get(self):
         posts = greetings = Post.all().order('-created')
         self.render('front.html', posts = posts)
 
+# Handler of the post permalink page
 class PostPage(BlogHandler):
     # to check if user is authorized to proceed by comparing user_id and the post associated user_id
-    # returns post if true
+    # returns the Post instance if true
     def user_auth(self, post_id):
         post = self.retrieve_post(post_id)
         if not post:
@@ -194,21 +206,29 @@ class PostPage(BlogHandler):
         post = db.get(key)
         return post
 
+    # To get post by post_id
     def get(self, post_id):
-        comments = Comment.get_by_post_id(post_id)
-        posted_by_user = self.user_auth(post_id)
+        comments = Comment.get_by_post_id(post_id) # gets associated comments
+        posted_by_user = self.user_auth(post_id) # verified if the post is posted by currently logged in user
 
-        post = self.retrieve_post(post_id)
+        post = self.retrieve_post(post_id) 
         if not post:
             self.error(404)
             return
-        if Like.user_liked(post_id, self.uid):
+        if Like.user_liked(post_id, self.uid): # Check if the logged in user liked the post
             like = "Unlike"
         else:
             like = "Like"
 
-        self.render("permalink.html", post=post, like=like, posted_by_user=posted_by_user, comments=comments, uid=self.uid)
+        params = dict(post = post,
+                      like = like,
+                      posted_by_user = posted_by_user,
+                      comments = comments,
+                      uid = self.uid)
 
+        self.render("permalink.html", **params)
+
+    # This post alters the like / unlike status
     def post(self, post_id):
         if not self.user:
             self.redirect("/login")
@@ -237,13 +257,15 @@ class PostPage(BlogHandler):
         
         self.redirect('/blog/%s' % post_id)
         
-
+# Handler for posting new post
 class NewPost(BlogHandler):
+    # Renders the write post form
     def get(self):
         self.loggedin_check()
 
         self.render("writepost.html", newpost=True)
 
+    # Submits the write post form
     def post(self):
         self.loggedin_check()
 
@@ -256,10 +278,15 @@ class NewPost(BlogHandler):
             self.redirect('/blog/%s' % str(p.key().id()))
         else:
             error = "subject and content, please!"
-            self.render("writepost.html", subject=subject, content=content, error=error, newpost=True)
+            params = dict(subject = subject,
+                          content = content,
+                          error = error,
+                          newpost = True)            
+            self.render("writepost.html", **params)
 
+# Handler for editing post
 class EditPost(PostPage):
-
+    # Renders the write post form with stored subject and content
     def get(self, post_id):
         self.loggedin_check()
 
@@ -275,7 +302,7 @@ class EditPost(PostPage):
                       newpost = False)
 
         self.render("writepost.html", **params)
-    
+    # Submits the edited form
     def post(self, post_id):
         self.loggedin_check()
 
@@ -302,7 +329,7 @@ class EditPost(PostPage):
                       newpost = False)
 
             self.render("writepost.html", **params)
-        
+# Handler to delete a post        
 class DeletePost(PostPage):
     def get(self, post_id):
         self.loggedin_check()
@@ -326,6 +353,7 @@ class DeletePost(PostPage):
             
         self.redirect("/blog")
 
+# Handler to post a new comment
 class NewComment(BlogHandler):
     def get(self, post_id):
         self.loggedin_check()
@@ -342,10 +370,14 @@ class NewComment(BlogHandler):
             self.redirect('/blog/%s' % post_id)
         else:
             error = "leave a comment, please!"
-            self.render("writecomment.html", comment_text=comment_text, error=error, newcomment=True)
+            params = dict(comment_text=comment_text,
+                          error=error,
+                          newcomment=True)
+            self.render("writecomment.html", **params)
 
-
+# Handler to edit a comment
 class EditComment(BlogHandler):
+    # checks if the user is the commenter
     def commenter_auth(self, comment_id):
         comment = self.retrieve_comment(comment_id)
         if not comment:
@@ -396,6 +428,7 @@ class EditComment(BlogHandler):
 
             self.render("writecomment.html", **params)
 
+# Handler to delete a comment
 class DeleteComment(EditComment):
     def get(self, comment_id):
         self.loggedin_check()
@@ -418,6 +451,7 @@ class DeleteComment(EditComment):
         comment.delete()    
         self.redirect("/blog/" + post_id)    
 
+# User data regex - for sign up 
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
 def valid_username(username):
     return username and USER_RE.match(username)
@@ -430,6 +464,7 @@ EMAIL_RE  = re.compile(r'^[\S]+@[\S]+\.[\S]+$')
 def valid_email(email):
     return not email or EMAIL_RE.match(email)
 
+# Sign up handler
 class Signup(BlogHandler):
     def done(self, *a, **kw):
         #make sure the user doesn't already exist
@@ -476,7 +511,7 @@ class Signup(BlogHandler):
             self.render('signup-form.html', **params)
         else:
             self.done()
-
+# Log in handler
 class Login(BlogHandler):
     def get(self):
         self.render('login-form.html')
@@ -492,7 +527,7 @@ class Login(BlogHandler):
         else:
             msg = 'Invalid login'
             self.render('login-form.html', error = msg)
-
+# Logout handler
 class Logout(BlogHandler):
     def get(self):
         self.logout()
