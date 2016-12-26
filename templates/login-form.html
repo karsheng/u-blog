@@ -1,19 +1,9 @@
-<!DOCTYPE html>
+{% extends "base.html" %}
 
-<html>
-  <head>
-    <title>Login</title>
-    <style type="text/css">
-      .label {text-align: right}
-      .error {color: red}
-    </style>
-
-  </head>
-
-  <body>
+{% block content %}
     <h2>Login</h2>
     <form method="post">
-      <table>
+      <table class="auth-form">
         <tr>
           <td class="label">
             Username
@@ -36,9 +26,7 @@
       <div class="error">
         {{error}}
       </div>
-
       <input type="submit">
     </form>
-  </body>
-
-</html>
+    <p>Not a member? <a href="/signup">Sign up</a></p>
+{% endblock %}

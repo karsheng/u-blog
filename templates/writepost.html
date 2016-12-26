@@ -11,25 +11,27 @@
   </h2>
   
     <form method="post">
-      <label>
-        <div>subject</div>
-        <input type="text" name="subject" value="{{subject}}">
-      </label>
+      <div class="newpost-form">
+        <label>
+          <div>subject</div>
+          <input type="text" name="subject" value="{{subject}}">
+        </label>
 
-      <label>
-        <div>blog</div>
-        <textarea name="content">{{content}}</textarea>
-      </label>
+        <label>
+          <div>blog</div>
+          <textarea name="content">{{content}}</textarea>
+        </label>
 
-      <div class="error">{{error}}</div>
+        <div class="error">{{error}}</div>
 
-      <input class="submit-btn" type="submit">
-      <a href="/blog">Cancel</a>
-      {% if not newpost: %}
-      <div class="right">
-        <a class="delete-btn" href="/blog/delete/{{post_id}}">Delete</a>
+        <input class="submit-btn" type="submit">
+        <a href="/blog">Cancel</a>
+        {% if not newpost: %}
+        <div class="right">
+          <a class="delete-btn" href="/blog/delete/{{post_id}}">Delete</a>
+        </div>
+        {% endif %}
       </div>
-      {% endif %}
     </form>
 
 {% endblock %}
